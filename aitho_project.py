@@ -17,6 +17,8 @@ def _(mo):
     - Install the dependencies specified in the pyproject.toml file (WIP)
     - Set the `OPENAI_API_KEY` in your .env inside Marimo
     - Run the code!
+    - **NOTE**: when choosing what type of subject you want to be examined on, writing '**exam**' anywhere in the input prompt will enable the grading feature. You will be graded on a scale from 0 to 30, and the final vote will be the average of all grades obtained during the exam.
+    - To stop the program, write 'quit'
     """
     )
     return
@@ -60,6 +62,7 @@ def ask_question(client, role, subject, is_exam, user_message):
         "Ask exactly one question, then wait for the candidate’s answer. "
         "Try to switch up the questions, do not always repeat the same question"
         "Try to surprise the candidate with questions he might not expect, while staying true to the subject."
+        f"The question asked must also be closely related to your role, remember that you are a {role}"
         "If the candidate says 'quit' or 'exit', end politely."
     )
     resp = client.chat.completions.create(
