@@ -1,0 +1,13 @@
+[project]
+name = "Aitho_MultiRole_Interview_Exam_Agent"
+version = "0.1"
+description = "AI multirole interviewer, powered by OpenAI"
+authors = [{name="Elvio Santangelo"}]
+requires-python = ">=3.11"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.marimo.runtime]
+dotenv = [".env"]
