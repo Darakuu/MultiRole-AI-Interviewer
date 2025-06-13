@@ -58,6 +58,8 @@ def ask_question(client, role, subject, is_exam, user_message):
     system_prompt = (
         f"You are a {role} conducting an oral {mode} on '{subject}'. "
         "Ask exactly one question, then wait for the candidate’s answer. "
+        "Try to switch up the questions, do not always repeat the same question"
+        "Try to surprise the candidate with questions he might not expect, while staying true to the subject."
         "If the candidate says 'quit' or 'exit', end politely."
     )
     resp = client.chat.completions.create(
@@ -74,11 +76,12 @@ def ask_question(client, role, subject, is_exam, user_message):
 def _(re):
     def grade_answer(client, question, answer):
         """
-        If in exam mode, ask the model to grade the answer and return a float 0-100.
+        If in exam mode, ask the model to grade the answer and return a float 0-30.
         """
         grade_prompt = (
-            f"You are an unbiased examiner. Grade the following answer on a scale from 0 to 100 (just a number) "
+            f"You are an unbiased examiner. Grade the following answer on a scale from 0 to 30 (just a number) "
             f"to the question: '{question}'. Answer: '{answer}'. "
+            "The higher the grade, the better the answer. Grade the answer based on the accuracy and correctness of it, compared to the question. If the answer correctly answers the question, feel free to give 30 as a mark."
             "Respond with just the numeric grade."
         )
         resp = client.chat.completions.create(
@@ -117,7 +120,7 @@ def _(OpenAI, grade_answer):
             if answer.lower() in ("quit", "exit"):
                 if is_exam and grades:
                     avg = sum(grades) / len(grades)
-                    print(f"\n=== Exam ended. Your final grade: {avg:.1f}/100 ===")
+                    print(f"\n=== Exam ended. Your final grade: {avg:.1f}/30 ===")
                 else:
                     print("\n=== Interview ended. Thank you! ===")
                 break
@@ -126,7 +129,7 @@ def _(OpenAI, grade_answer):
             if is_exam:
                 grade = grade_answer(client, question, answer)
                 grades.append(grade)
-                print(f"Grade for this answer: {grade}/100\n")
+                print(f"Grade for this answer: {grade}/30\n")
 
             idx += 1
     return (run_interview,)
