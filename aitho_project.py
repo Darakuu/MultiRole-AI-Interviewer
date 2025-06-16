@@ -1,7 +1,7 @@
 import marimo
 
 __generated_with = "0.13.15"
-app = marimo.App(width="medium")
+app = marimo.App(width="full")
 
 
 @app.cell
@@ -84,7 +84,7 @@ def _(re):
         grade_prompt = (
             f"You are an unbiased examiner. Grade the following answer on a scale from 0 to 30 (just a number) "
             f"to the question: '{question}'. Answer: '{answer}'. "
-            "The higher the grade, the better the answer. Grade the answer based on the accuracy and correctness of it, compared to the question. If the answer correctly answers the question, feel free to give 30 as a mark."
+            "The better the answer, The higher the grade. Grade the answer based on the accuracy and correctness of it, compared to the question. If the answer correctly answers the question, feel free to give 30 as a mark."
             "Respond with just the numeric grade."
         )
         resp = client.chat.completions.create(

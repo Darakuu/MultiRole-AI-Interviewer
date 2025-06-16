@@ -5,10 +5,6 @@ description = "AI multirole interviewer, powered by OpenAI"
 authors = [{name="Elvio Santangelo"}]
 requires-python = ">=3.11"
 dependencies = [
-    "langchain (>=0.3.25,<0.4.0)",
-    "langchain-openai (>=0.3.17,<0.4.0)",
-    "langgraph (>=0.4.5,<0.5.0)",
-    "langchain-community (>=0.3.24,<0.4.0)",
     "openai (>=1.86.0)",
     "mcp (>=1.9.3)",
     "langchain-text-splitters (>=0.3.8)",
