@@ -3,9 +3,10 @@
 This notebook implements a modular, cell-based interactive interview/exam simulator using the OpenAI API.
 
 ## Usage instructions:
+- Install Miramo,
 - Install Poetry,
-- Install the dependencies specified in the pyproject.toml file
-- Set the `OPENAI_API_KEY` in your .env inside Marimo
+- Install the dependencies specified in the pyproject.toml file,
+- Set the `OPENAI_API_KEY` in your .env inside Marimo,
 - Run the code!
 
 ## Exam vs Interview mode
