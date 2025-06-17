@@ -29,8 +29,44 @@ def _():
     import marimo as mo
     import os
     import re
+
     from openai import OpenAI
-    return OpenAI, mo, re
+
+    from langchain_community.llms import OpenAI as LCOpenAI
+    from langchain_community.chat_models import ChatOpenAI
+
+    # ← instead of langchain.root, import LLMChain from langchain.chains
+    from langchain.chains import LLMChain
+    # ← PromptTemplate now lives in langchain_core.prompts
+    from langchain_core.prompts import PromptTemplate
+
+    from langchain.memory import ConversationBufferMemory
+    from langchain.agents import Tool
+
+    from langchain.prompts import (
+        ChatPromptTemplate,
+        SystemMessagePromptTemplate,
+        HumanMessagePromptTemplate,
+    )
+    return (
+        ChatOpenAI,
+        ChatPromptTemplate,
+        ConversationBufferMemory,
+        HumanMessagePromptTemplate,
+        LLMChain,
+        OpenAI,
+        SystemMessagePromptTemplate,
+        Tool,
+        mo,
+        re,
+    )
+
+
+@app.cell
+def _(OpenAI):
+    # single global OpenAI client.
+    client = OpenAI()
+    return
 
 
 @app.function
@@ -50,73 +86,104 @@ def get_subject_and_roles():
     return subject, roles, is_exam
 
 
-@app.function
-def ask_question(client, role, subject, is_exam, user_message):
-    """
-    Send a prompt to the model to ask exactly one question.
-    Returns the generated question string.
-    """
-    mode = 'exam' if is_exam else 'interview'
-    system_prompt = (
-        f"You are a {role} conducting an oral {mode} on '{subject}'. "
-        "Ask exactly one question, then wait for the candidate’s answer. "
-        "Try to switch up the questions, do not always repeat the same question"
-        "Try to surprise the candidate with questions he might not expect, while staying true to the subject."
-        f"The question asked must also be closely related to your role, remember that you are a {role}"
-        "If the candidate says 'quit' or 'exit', end politely."
-    )
-    resp = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ],
-    )
-    return resp.choices[0].message.content.strip()
+@app.cell
+def _(
+    ChatOpenAI,
+    ChatPromptTemplate,
+    ConversationBufferMemory,
+    HumanMessagePromptTemplate,
+    LLMChain,
+    SystemMessagePromptTemplate,
+    Tool,
+):
+    def make_role_agent(role: str, subject: str, is_exam: bool) -> Tool:
+        mode = "exam" if is_exam else "interview"
+
+        # 3.1) Define a system message and a human message
+        system_template = (
+            f"You are a **{role}** conducting an oral **{mode}** on “{subject}.”\n"
+            "Ask exactly **one** question, then stop and wait for the candidate’s reply.\n"
+            "Try to switch up the questions, do not always repeat the same question"
+            "Try to surprise the candidate with questions he might not expect, while staying true to the subject.\n"
+            "Vary your questions and stay true to your role."
+        )
+        system_msg = SystemMessagePromptTemplate.from_template(system_template)
+        human_msg  = HumanMessagePromptTemplate.from_template("{user_input}")
+
+        # 3.2) Combine into a ChatPromptTemplate
+        chat_prompt = ChatPromptTemplate.from_messages([system_msg, human_msg])
+
+        # 3.3) Create the chain, with memory so each role keeps its own history
+        chain = LLMChain(
+            llm=ChatOpenAI(model_name="gpt-4o", temperature=0.7),
+            prompt=chat_prompt,
+            memory=ConversationBufferMemory(memory_key="chat_history"),
+        )
+
+        # 3.4) Wrap it as a Tool so you can call `tool.func(...)`
+        return Tool(
+            name=role,
+            func=lambda user_input: chain.run(user_input=user_input),
+            description=f"Asks one question in the style of a {role}.",
+        )
+    return (make_role_agent,)
 
 
 @app.cell
-def _(re):
-    def grade_answer(client, question, answer):
+def _(ChatOpenAI, re):
+    from langchain.schema import SystemMessage
+
+    def grade_answer(question: str, answer: str) -> float:
         """
-        If in exam mode, ask the model to grade the answer and return a float 0-30.
+        If in exam mode, ask the model to grade the answer and return a float 0–30.
         """
         grade_prompt = (
             f"You are an unbiased examiner. Grade the following answer on a scale from 0 to 30 (just a number) "
             f"to the question: '{question}'. Answer: '{answer}'. "
-            "The better the answer, The higher the grade. Grade the answer based on the accuracy and correctness of it, compared to the question. If the answer correctly answers the question, feel free to give 30 as a mark."
+            "The better the answer, the higher the grade. Grade based on accuracy and correctness. "
             "Respond with just the numeric grade."
         )
-        resp = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "system", "content": grade_prompt}],
-        )
-        try:
-            return float(re.search(r"(\d+(?:\.\d+)?)", resp.choices[0].message.content).group(1))
-        except Exception:
-            return 0.0
+
+        chat = ChatOpenAI(model_name="gpt-4o", temperature=0)
+
+        ai_msg = chat.invoke([SystemMessage(content=grade_prompt)])
+
+        text = ai_msg.content
+
+        # Try to find a numeric grade in the response text
+        match = re.search(r"(\d+(?:\.\d+)?)", text)
+        if match:
+            # Convert the captured substring to a float and return it
+            return float(match.group(1))
+
+        # If no number was found, default to zero
+        return 0.0
 
     return (grade_answer,)
 
 
 @app.cell
-def _(OpenAI, grade_answer):
+def _(grade_answer, make_role_agent):
     def run_interview():
-        """
-        Main loop: initializes client, prompts subject/roles, cycles through roles asking questions,
-        collects answers, optionally grades, and prints final results on quit.
-        """
-        client = OpenAI()
         subject, roles, is_exam = get_subject_and_roles()
-        grades = []
+        # build one agent per role
+        agents = [make_role_agent(r, subject, is_exam) for r in roles]
+
         print(f"\n=== Starting {'EXAM' if is_exam else 'INTERVIEW'} on '{subject}' ===\n")
 
+        grades = []
         idx = 0
         last_answer = None
+
         while True:
             role = roles[idx % len(roles)]
+            # pull the matching Tool so we keep the order        
+            tool = next(t for t in agents if t.name == role)
+
             user_msg = "START" if idx == 0 else last_answer
-            question = ask_question(client, role, subject, is_exam, user_msg)
+        
+            # each call to tool.func() runs its own LLMChain + memory
+            question = tool.func(user_msg)
             print(f"{role} ➜ {question}\n")
 
             answer = input("Your answer (or 'quit' to exit): ").strip()
@@ -130,9 +197,9 @@ def _(OpenAI, grade_answer):
 
             last_answer = answer
             if is_exam:
-                grade = grade_answer(client, question, answer)
-                grades.append(grade)
-                print(f"Grade for this answer: {grade}/30\n")
+                g = grade_answer(question, answer)
+                grades.append(g)
+                print(f"Grade for this answer: {g}/30\n")
 
             idx += 1
     return (run_interview,)
