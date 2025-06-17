@@ -134,7 +134,7 @@ def _(
             seen: set[str] = set()
 
             def ask_unique(user_input: str) -> str:
-                for _ in range(3):
+                for _ in range(6):
                     out = chain.run(user_input=user_input).strip()
                     if out not in seen:
                         seen.add(out)
