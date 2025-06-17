@@ -4,20 +4,23 @@ version = "1.0.0"
 description = "AI multirole interviewer and exam simulator powered by OpenAI"
 readme = "README.md"
 authors = [{name="Elvio Santangelo"}]
-requires-python = ">=3.11"
+requires-python = ">=3.11,<4.0"
 keywords = [
   "AI", "LLM", "marimo", "langchain", "interview", "exam", "agent"
 ]
 dependencies = [
-  "marimo>=0.13.15",
-  "openai>=1.86.0",
-  "langchain>=0.3.25",
-  "langchain-community>=0.0.1"
+  "marimo==0.13.15",
+  "openai==1.86.0",
+  "langchain>=0.3.25,<0.4.0",
+  "langchain-openai>=0.3.17,<0.4.0",
 ]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+package-mode = false
 
 [tool.marimo.runtime]
 dotenv = [".env"]

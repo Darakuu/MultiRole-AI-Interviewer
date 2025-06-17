@@ -34,7 +34,8 @@ def _():
     import re
 
     from openai import OpenAI
-    from langchain_community.chat_models import ChatOpenAI
+
+    from langchain_openai import ChatOpenAI
 
     from langchain.chains import LLMChain
     from langchain.memory import ConversationBufferMemory
@@ -48,9 +49,7 @@ def _():
     return (
         ChatOpenAI,
         ChatPromptTemplate,
-        ConversationBufferMemory,
         HumanMessagePromptTemplate,
-        LLMChain,
         OpenAI,
         SystemMessage,
         SystemMessagePromptTemplate,
@@ -88,16 +87,14 @@ def get_subject_and_roles():
 def _(
     ChatOpenAI,
     ChatPromptTemplate,
-    ConversationBufferMemory,
     HumanMessagePromptTemplate,
-    LLMChain,
     SystemMessagePromptTemplate,
     Tool,
 ):
     def make_role_agent(role: str, subject: str, is_exam: bool) -> Tool:
             mode = "exam" if is_exam else "interview"
 
-            # pick the right system prompt depending on exam vs interview
+            # choose the right system prompt
             if is_exam:
                 system_template = (
                     f"You are a **{role}** conducting an oral **{mode}** on “{subject}.”\n"
@@ -107,27 +104,31 @@ def _(
             else:
                 system_template = (
                     f"You are a **{role}** conducting an oral **{mode}** on “{subject}.”\n"
-                    "When given the candidate’s previous answer, first provide a brief comment on their response, "
-                    "then ask exactly **one** follow-up question that builds on what they said. "
-                    "If this is the very first turn (input = START), just ask the opening question.\n"
+                    "First give a brief comment on the candidate’s last answer (unless input=START),\n"
+                    "then ask exactly **one** follow-up question that builds on what they said."
                 )
 
+            # build our chat prompt
             system_msg = SystemMessagePromptTemplate.from_template(system_template)
             human_msg  = HumanMessagePromptTemplate.from_template("{user_input}")
             chat_prompt = ChatPromptTemplate.from_messages([system_msg, human_msg])
 
-            chain = LLMChain(
-                llm=ChatOpenAI(model_name="gpt-4o", temperature=0.7),
-                prompt=chat_prompt,
-                memory=ConversationBufferMemory(memory_key="chat_history"),
-            )
+            # new chat LLM from the langchain-openai package -- stop depcreation warnings...
+            llm = ChatOpenAI(model="gpt-4o", temperature=0.7)
 
-            # keep track of every question/comment combo to avoid exact repeats
+            # this creates a simple RunnableSequence: prompt→LLM
+            chain = chat_prompt | llm
+
             seen: set[str] = set()
-
             def ask_unique(user_input: str) -> str:
-                for _ in range(6):
-                    out = chain.run(user_input=user_input).strip()
+                # `.invoke()` replaces .run/.call -- same as before...
+                for _ in range(3):
+                    ai_msg = chain.invoke({"user_input": user_input})
+                    out = (
+                        ai_msg.content.strip()
+                        if hasattr(ai_msg, "content")
+                        else str(ai_msg).strip()
+                    )
                     if out not in seen:
                         seen.add(out)
                         return out
@@ -136,7 +137,7 @@ def _(
             return Tool(
                 name=role,
                 func=ask_unique,
-                description=f"Comments & asks next question in the style of a {role}.",
+                description=f"Asks one question (with comment in interview mode) in the style of a {role}, never repeating."
             )
     return (make_role_agent,)
 
@@ -264,10 +265,10 @@ def _(evaluate_hidden_score, grade_answer, make_role_agent):
                 delta = evaluate_hidden_score(question, answer)
                 hidden_score += delta
                 judge = "Interview Judge"
-            
+
                 # DEBUG SCORE:
                 print(f"Hidden Score is now: [ {hidden_score} ], changed by [{delta}] ")
-            
+
                 if hidden_score < threshold:
                     print(f"{judge} ➜ Unfortunately, based on the conversation so far, we must end the interview.\n")
                     print("\n=== Interview failed. Thank you for your time! ===")
