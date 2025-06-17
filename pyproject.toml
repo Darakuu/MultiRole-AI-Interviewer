@@ -1,13 +1,18 @@
 [project]
 name = "Aitho_MultiRole_Interview_Exam_Agent"
-version = "0.1"
-description = "AI multirole interviewer, powered by OpenAI"
+version = "1.0.0"
+description = "AI multirole interviewer and exam simulator powered by OpenAI"
+readme = "README.md"
 authors = [{name="Elvio Santangelo"}]
 requires-python = ">=3.11"
+keywords = [
+  "AI", "LLM", "marimo", "langchain", "interview", "exam", "agent"
+]
 dependencies = [
-    "openai (>=1.86.0)",
-    "mcp (>=1.9.3)",
-    "langchain-text-splitters (>=0.3.8)",
+  "marimo>=0.13.15",
+  "openai>=1.86.0",
+  "langchain>=0.3.25",
+  "langchain-community>=0.0.1"
 ]
 
 [build-system]
