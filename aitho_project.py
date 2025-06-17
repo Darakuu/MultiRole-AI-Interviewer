@@ -97,35 +97,44 @@ def _(
     Tool,
 ):
     def make_role_agent(role: str, subject: str, is_exam: bool) -> Tool:
-        mode = "exam" if is_exam else "interview"
+            mode = "exam" if is_exam else "interview"
 
-        # 3.1) Define a system message and a human message
-        system_template = (
-            f"You are a **{role}** conducting an oral **{mode}** on “{subject}.”\n"
-            "Ask exactly **one** question, then stop and wait for the candidate’s reply.\n"
-            "Try to switch up the questions, do not always repeat the same question"
-            "Try to surprise the candidate with questions he might not expect, while staying true to the subject.\n"
-            "Vary your questions and stay true to your role."
-        )
-        system_msg = SystemMessagePromptTemplate.from_template(system_template)
-        human_msg  = HumanMessagePromptTemplate.from_template("{user_input}")
+            # Define a system message and a human message
+            system_template = (
+                f"You are a **{role}** conducting an oral **{mode}** on “{subject}.”\n"
+                "Ask exactly **one** question, then stop and wait for the candidate’s reply.\n"
+                "Vary your questions and stay true to your role."
+            )
+            system_msg = SystemMessagePromptTemplate.from_template(system_template)
+            human_msg  = HumanMessagePromptTemplate.from_template("{user_input}")
+    
+            chat_prompt = ChatPromptTemplate.from_messages([system_msg, human_msg])
 
-        # 3.2) Combine into a ChatPromptTemplate
-        chat_prompt = ChatPromptTemplate.from_messages([system_msg, human_msg])
+            # Create the chain, with memory so each role keeps its own history
+            chain = LLMChain(
+                llm=ChatOpenAI(model_name="gpt-4o", temperature=0.7),
+                prompt=chat_prompt,
+                memory=ConversationBufferMemory(memory_key="chat_history"),
+            )
 
-        # 3.3) Create the chain, with memory so each role keeps its own history
-        chain = LLMChain(
-            llm=ChatOpenAI(model_name="gpt-4o", temperature=0.7),
-            prompt=chat_prompt,
-            memory=ConversationBufferMemory(memory_key="chat_history"),
-        )
+            # keep track of every question this role has ever asked
+            asked_questions: set[str] = set()
 
-        # 3.4) Wrap it as a Tool so you can call `tool.func(...)`
-        return Tool(
-            name=role,
-            func=lambda user_input: chain.run(user_input=user_input),
-            description=f"Asks one question in the style of a {role}.",
-        )
+            def ask_unique(user_input: str) -> str:
+                # try up to N times to get a new question
+                for _ in range(3):
+                    q = chain.run(user_input=user_input).strip()
+                    if q not in asked_questions:
+                        asked_questions.add(q)
+                        return q
+                # if we still keep getting repeats, just return the last one
+                return q
+
+            return Tool(
+                name=role,
+                func=ask_unique,
+                description=f"Asks one question in the style of a {role}, never repeating."
+            )
     return (make_role_agent,)
 
 
