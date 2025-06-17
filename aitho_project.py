@@ -14,7 +14,7 @@ def _(mo):
 
     ## Usage instructions:
     - Install Poetry,
-    - Install the dependencies specified in the pyproject.toml file (WIP)
+    - Install the dependencies specified in the pyproject.toml file
     - Set the `OPENAI_API_KEY` in your .env inside Marimo
     - Run the code!
     - **NOTE**: when choosing what type of subject you want to be examined on, writing '**exam**' anywhere in the input prompt will enable the grading feature. You will be graded on a scale from 0 to 30, and the final vote will be the average of all grades obtained during the exam.
@@ -34,24 +34,16 @@ def _():
     import re
 
     from openai import OpenAI
-
-    from langchain_community.llms import OpenAI as LCOpenAI
     from langchain_community.chat_models import ChatOpenAI
 
-    # ← instead of langchain.root, import LLMChain from langchain.chains
     from langchain.chains import LLMChain
-    # ← PromptTemplate now lives in langchain_core.prompts
-    from langchain_core.prompts import PromptTemplate
-
     from langchain.memory import ConversationBufferMemory
     from langchain.agents import Tool
-
     from langchain.prompts import (
         ChatPromptTemplate,
         SystemMessagePromptTemplate,
         HumanMessagePromptTemplate,
     )
-
     from langchain.schema import SystemMessage
     return (
         ChatOpenAI,
